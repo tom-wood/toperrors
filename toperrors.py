@@ -13,18 +13,8 @@ fpath += "/Standards/POL109230-NBS-640b-Si-Riet-01.inp"
 
 extract_all = False
 
-#parameter names/values to record
-refined_params = []
-refp_vals = []
-refp_uncs = []
-unrefined_params = []
-defines = []
-#flags for finding comments and comment blocks
-ignore = False 
-ignoredef = False 
-define = False 
-ifdef = False 
-endif = False
+
+#import re
 
 def line_comment(s, ignore):
     """Looks for ' and returns (modified) string and break_bool"""
@@ -105,13 +95,51 @@ def set_ignoredef(s, ifdef, defines, ignoredef, endif):
 # This needs to find the parameter values---comments seem to have been dealt
 # with nicely.
 
+def is_bkg(s):
+    """Return boolean depending on whether string indicates bkg"""
+    if s == 'bkg':
+        return True
+    else:
+        return False
+
+def extract_params(s):
+    """Return parameter value and uncertainty from string"""
+    s = s.split('_')
+    if not s[0][-1].isdigit():
+        s[0] = s[0][:-1]
+    p = float(s[0])
+    if len(s) > 1:
+        u = float(s[1])
+    else:
+        u = 0.
+    return p, u
+    
+
+#parameter names/values to record
+bkg_count = 0
+#unnamed_count = 0
+refined_params = []
+refp_vals = []
+refp_uncs = []
+unrefined_params = []
+unrefp_vals = []
+defines = []
+#flags for finding comments and comment blocks
+ignore = False 
+ignoredef = False 
+define = False 
+ifdef = False 
+endif = False
+#flags for finding parameters
+bkg = False
+refined = False
 
 with open(fpath, 'r') as f:
     for i, line in enumerate(f):
-        string = "line %d: ignoredef = %s" % (i, ignoredef)
-        print(string)
-        if i > 50:
-            break
+        #string = "line %d: ignoredef = %s" % (i, ignoredef)
+        #print(string)
+        #if i > 50:
+        #    break
         for l in line.split():
             s, break_bool = line_comment(l, ignore)
             if not break_bool:
@@ -132,6 +160,31 @@ with open(fpath, 'r') as f:
             define = is_define(s)
             
             #put in parameter gets here
+            #check for background parameters
+            #check for @ parameters
+            #check for prm parameters
+            #check for macro parameters
+            if bkg:
+                if l == '@':
+                    refined = True
+                    print('found @')
+                    continue
+                elif l[0].isalpha() == False:
+                    p, u = extract_params(l)
+                    p_name = 'bkg' + str(bkg_count)
+                    bkg_count += 1
+                    if refined:
+                        refp_vals.append(p)
+                        refp_uncs.append(u)
+                        refined_params.append(p_name)
+                    else:
+                        unrefp_vals.append(p)
+                        unrefined_params.append(p_name)
+                    continue
+            refined = False                    
+            bkg = is_bkg(l)
+            if bkg:
+                print('set bkg')
             
             if break_bool:
                 break
