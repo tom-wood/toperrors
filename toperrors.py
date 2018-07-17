@@ -102,6 +102,13 @@ def is_bkg(s):
     else:
         return False
 
+def is_prm(s):
+    """Return boolean depending on whether string indicates prm"""
+    if s == 'prm':
+        return True
+    else:
+        return False
+
 def extract_params(s):
     """Return parameter value and uncertainty from string"""
     s = s.split('_')
@@ -109,6 +116,8 @@ def extract_params(s):
         s[0] = s[0][:-1]
     p = float(s[0])
     if len(s) > 1:
+        if not s[1][-1].isdigit():
+            s[1] = s[1][:-1]
         u = float(s[1])
     else:
         u = 0.
