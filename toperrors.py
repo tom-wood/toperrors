@@ -115,7 +115,7 @@ def extract_params(s):
     if not s[0][-1].isdigit():
         s[0] = s[0][:-1]
     p = float(s[0])
-    if len(s) > 1:
+    if len(s) > 1 and s[1][0].isalpha() == False:
         if not s[1][-1].isdigit():
             s[1] = s[1][:-1]
         u = float(s[1])
@@ -126,12 +126,13 @@ def extract_params(s):
 
 #parameter names/values to record
 bkg_count = 0
-#unnamed_count = 0
+unnamed_count = 0
 refined_params = []
 refp_vals = []
 refp_uncs = []
 unrefined_params = []
 unrefp_vals = []
+unrefp_uncs = []
 defines = []
 #flags for finding comments and comment blocks
 ignore = False 
@@ -142,13 +143,14 @@ endif = False
 #flags for finding parameters
 bkg = False
 refined = False
+prm = False
+equal_defer = False
+semicolon = False
 
 with open(fpath, 'r') as f:
     for i, line in enumerate(f):
         #string = "line %d: ignoredef = %s" % (i, ignoredef)
         #print(string)
-        #if i > 50:
-        #    break
         for l in line.split():
             s, break_bool = line_comment(l, ignore)
             if not break_bool:
@@ -176,7 +178,6 @@ with open(fpath, 'r') as f:
             if bkg:
                 if l == '@':
                     refined = True
-                    print('found @')
                     continue
                 elif l[0].isalpha() == False:
                     p, u = extract_params(l)
@@ -188,12 +189,71 @@ with open(fpath, 'r') as f:
                         refined_params.append(p_name)
                     else:
                         unrefp_vals.append(p)
+                        unrefp_uncs.append(u)
                         unrefined_params.append(p_name)
                     continue
-            refined = False                    
+            refined = False
             bkg = is_bkg(l)
-            if bkg:
-                print('set bkg')
+            if prm:
+                if l == '@':                  
+                    refined = True
+                    p_name = 'unknown_p' + str(unnamed_count)
+                    unnamed_count += 1
+                    continue
+                else:
+                    if l[0] == '!':
+                        p_name = l[1:]
+                        continue
+                    elif l[0].isalpha():
+                        if equal_defer:
+                            continue
+                        else:
+                            if semicolon:
+                                semicolon = False
+                                prm = False
+                                continue
+                            else:
+                                refined = True
+                                p_name = l
+                            continue
+                    elif l[0] == '=':
+                        equal_defer = True
+                        if l[-1] == ';':
+                            equal_defer = False
+                            semicolon = True
+                        continue
+                    elif l[0] == ';':
+                        equal_defer = False
+                        semicolon = True
+                        continue
+                    elif l[0] == '-' or l[0].isdigit():
+                        if equal_defer:
+                            if l[-1] == ';':
+                                semicolon = True
+                                equal_defer = False
+                            continue
+                        else:
+                            p, u = extract_params(l)
+                            if refined:
+                                refined_params.append(p_name)
+                                refp_vals.append(p)
+                                refp_uncs.append(u)
+                                refined = False
+                            else:
+                                unrefined_params.append(p_name)
+                                unrefp_vals.append(p)
+                                unrefp_uncs.append(u)  
+                            semicolon = False
+                            prm = False
+                    elif l[0] == ':':
+                        if semicolon:
+                            continue
+                    else:
+                        if l[-1] == ';':
+                            semicolon = True
+                            equal_defer = False
+                        continue
+            prm = is_prm(l)
             
             if break_bool:
                 break
