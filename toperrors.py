@@ -147,6 +147,10 @@ refined = False
 equal_defer = False
 semicolon = False
 extract_next = False
+occ = False
+site = False
+struc = False
+phase_name = False
 #flags for finding macros
 macro = False
 #keywords
@@ -156,10 +160,14 @@ ignore_keys = ['xdd', 'r_wp', 'r_exp', 'gof', 'r_exp_dash', 'r_wp_dash',
                'Rp', 'Rs', 'lam', 'la', 'lo', 'lh', 'lg', 'x_calculation_step']
 single_keys = ['continue_after_convergence', 'do_errors', 'str',  
                'view_structure', 'Dummy_Peak_Shape',]
-extract_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'prm', 'volume']
+extract_keys = ['prm']
+struc_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'volume', 'scale']
+site_keys = ['x', 'y', 'z', 'beq']
 #counting the number of times extra_values occur (for multiple r_wps etc.)
 count_extra = [0 for s in extra_values]
 count_extract = [0 for s in extract_keys]
+#count number of phases
+phase_count = 0
 
 with open(fpath, 'r') as f:
     for i, line in enumerate(f):
@@ -281,6 +289,43 @@ with open(fpath, 'r') as f:
                 extract_next = True
                 p_name = l + str(count_extract[extract_keys.index(l)])
                 count_extract[extract_keys.index(l)] += 1
+            #deal with structures, sites and occupancies
+            if l == 'str':
+                ph_name = 'phase' + str(phase_count)
+                phase_count += 1
+                struc = True
+            if phase_name:
+                if l[-1] == ')':
+                    ph_name = l[:-1]
+                else:
+                    ph_name = l
+                phase_name = False
+            if l[:4] == 'STR(':
+                struc = True
+                if ',' in l and len(l.split(',')[1]) > 1:
+                    if l.split(',')[1][-1] == ')':
+                        ph_name = l.split(',')[1][-1][:-1]
+                    else:
+                        ph_name = l.split(',')[1][-1]
+                else:
+                    phase_name = True
+            if struc:
+                if l == 'phase_name':
+                    phase_name = True
+                elif l in struc_keys:
+                    p_name = '_'.join([ph_name, l])
+                    print('%s struc key' % l)
+                    extract_next = True
+            if site:
+                current_site = l
+            if l == 'site':
+                site = True
+            if occ:
+                extract_next = True
+                occ = False
+                p_name = '_'.join([ph_name, current_site]) + '_occ'
+            if l == 'occ':
+                occ = True
             
             #This breaks the line when a ' comment out has been used
             if break_bool:
