@@ -147,6 +147,8 @@ refined = False
 equal_defer = False
 semicolon = False
 extract_next = False
+#flags for finding macros
+macro = False
 #keywords
 ignore_keys = ['xdd', 'r_wp', 'r_exp', 'gof', 'r_exp_dash', 'r_wp_dash',
                'r_p_dash', 'weighted_Durbin_Watson', 
@@ -179,6 +181,13 @@ with open(fpath, 'r') as f:
                 continue
             ifdef = is_ifdef(s)
             define = is_define(s)
+            #find macros and ignore
+            if macro:
+                if l[-1] == '}':
+                    macro = False
+                continue
+            if l == 'macro':
+                macro = True
             #work out background parameters
             if bkg:
                 if l == '@':
