@@ -11,7 +11,8 @@ the uncertainties calculated therein
 fpath = "C:/Users/vgx18551/Documents/Data/Polaris_Jun18_Faradion_cathode"
 fpath += "/Standards/POL109230-NBS-640b-Si-Riet-01.inp"
 
-extract_all = False
+extra_values = ['r_wp']
+#extract_all = False
 
 
 #import re
@@ -143,14 +144,23 @@ endif = False
 #flags for finding parameters
 bkg = False
 refined = False
-prm = False
 equal_defer = False
 semicolon = False
+extract_next = False
+#keywords
+ignore_keys = ['xdd', 'r_wp', 'r_exp', 'gof', 'r_exp_dash', 'r_wp_dash',
+               'r_p_dash', 'weighted_Durbin_Watson', 
+               'penalties_weighting_K1', 'start_X', 'finish_X', 'fit_obj', 
+               'Rp', 'Rs', 'lam', 'la', 'lo', 'lh', 'lg', 'x_calculation_step']
+single_keys = ['continue_after_convergence', 'do_errors', 'str',  
+               'view_structure', 'Dummy_Peak_Shape',]
+extract_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'prm', 'volume']
+#counting the number of times extra_values occur (for multiple r_wps etc.)
+count_extra = [0 for s in extra_values]
+count_extract = [0 for s in extract_keys]
 
 with open(fpath, 'r') as f:
     for i, line in enumerate(f):
-        #string = "line %d: ignoredef = %s" % (i, ignoredef)
-        #print(string)
         for l in line.split():
             s, break_bool = line_comment(l, ignore)
             if not break_bool:
@@ -169,12 +179,7 @@ with open(fpath, 'r') as f:
                 continue
             ifdef = is_ifdef(s)
             define = is_define(s)
-            
-            #put in parameter gets here
-            #check for background parameters
-            #check for @ parameters
-            #check for prm parameters
-            #check for macro parameters
+            #work out background parameters
             if bkg:
                 if l == '@':
                     refined = True
@@ -194,11 +199,10 @@ with open(fpath, 'r') as f:
                     continue
             refined = False
             bkg = is_bkg(l)
-            if prm:
+            #work out prm parameters
+            if extract_next:
                 if l == '@':                  
                     refined = True
-                    p_name = 'unknown_p' + str(unnamed_count)
-                    unnamed_count += 1
                     continue
                 else:
                     if l[0] == '!':
@@ -243,8 +247,9 @@ with open(fpath, 'r') as f:
                                 unrefined_params.append(p_name)
                                 unrefp_vals.append(p)
                                 unrefp_uncs.append(u)  
+                                print('%s added on line %d' %(p_name, i+1))
                             semicolon = False
-                            prm = False
+                            extract_next = False
                     elif l[0] == ':':
                         if semicolon:
                             continue
@@ -253,7 +258,21 @@ with open(fpath, 'r') as f:
                             semicolon = True
                             equal_defer = False
                         continue
-            prm = is_prm(l)
+            #prm = is_prm(l)
+            if l in extra_values:
+                print('%s extra value' % l)
+                extract_next = True
+                p_name = l
+                d = extra_values.index(l)
+                if count_extra[d] != 0:
+                    p_name += str(count_extra[d])
+                count_extra[d] += 1
+            if l in extract_keys:
+                print('%s extract key' % l)
+                extract_next = True
+                p_name = l + str(count_extract[extract_keys.index(l)])
+                count_extract[extract_keys.index(l)] += 1
             
+            #This breaks the line when a ' comment out has been used
             if break_bool:
                 break
