@@ -149,6 +149,7 @@ semicolon = False
 extract_next = False
 occ = False
 site = False
+site_name = False
 struc = False
 phase_name = False
 #flags for finding macros
@@ -291,6 +292,7 @@ with open(fpath, 'r') as f:
                 count_extract[extract_keys.index(l)] += 1
             #deal with structures, sites and occupancies
             if l == 'str':
+                site = False
                 ph_name = 'phase' + str(phase_count)
                 phase_count += 1
                 struc = True
@@ -316,10 +318,17 @@ with open(fpath, 'r') as f:
                     p_name = '_'.join([ph_name, l])
                     print('%s struc key' % l)
                     extract_next = True
-            if site:
+            if site_name:
                 current_site = l
+                site_name = False
+            if site:
+                if l in site_keys:
+                    p_name = '_'.join([ph_name, current_site, l])
+                    print('%s site key' % l)
+                    extract_next = True
             if l == 'site':
                 site = True
+                site_name = True
             if occ:
                 extract_next = True
                 occ = False
@@ -330,3 +339,5 @@ with open(fpath, 'r') as f:
             #This breaks the line when a ' comment out has been used
             if break_bool:
                 break
+##############STILL to do
+#(i) deal with site keys; (ii) deal with phase names when they're strings.                
