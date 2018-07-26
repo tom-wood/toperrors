@@ -301,6 +301,8 @@ with open(fpath, 'r') as f:
                     ph_name = l[:-1]
                 else:
                     ph_name = l
+                if ph_name[0] and ph_name[-1] == '"':
+                    ph_name = ph_name[1:-1]
                 phase_name = False
             if l[:4] == 'STR(':
                 struc = True
