@@ -14,8 +14,23 @@ fpath += "/Standards/POL109230-NBS-640b-Si-Riet-01.inp"
 extra_values = ['r_wp']
 #extract_all = False
 
+macro_keys = ['Cubic', 'Tetragonal', 'Hexagonal', 'Rhombohedral',
+              'TOF_Strain_L', 'TOF_Strain_G', 'TOF_CS_L', 'TOF_CS_G',
+              'Strain_L', 'Strain_G', 'CS_L', 'CS_G']
 
-#import re
+#each macro_name has a corresponding macro_structures describing what to expect
+#within the '()' of said macro separted by ','. The key is: 0=ignore,
+#1=parameter name/@ symbol, 2=parameter value.
+macro_structures = [[2], [2, 2], [2, 2], [2, 2],
+                    [1, 2, 0], [1, 2, 0], [1, 2, 0], [1, 2, 0],
+                    [1, 2], [1, 2], [1, 2], [1, 2]]
+
+#macro rules:
+#(1) macro ending brackets must be followed by a space or newline character
+#(2) in macro_structures if there are any 1s, then there must be an equal
+#number of 2s.
+#(3) no equations with other parameter names in parameter value fields (this is
+#just too complicated to parse)
 
 def line_comment(s, ignore):
     """Looks for ' and returns (modified) string and break_bool"""
@@ -123,7 +138,114 @@ def extract_params(s):
     else:
         u = 0.
     return p, u
+
+def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
+                        refp_vals, refp_uncs, unrefined_params, unrefp_vals,
+                        unrefp_uncs, macro_name, macro_count, refined=False,
+                        need_name=False):
+    """Return parameter value and uncertainty from string
     
+    Args:
+        s (str): string to extract macro value from
+        ms_count (int): counter denoting how far into macro_structure to begin
+        macro_structure (list): list of value types to expect
+        exp_val (bool): determines whether next value is expected before comma
+        or has already been recorded (deals with values that are just spaces,
+        i.e. unrefined values with no name).
+        refined_params (list): list of strings of refined parameter names
+        refp_vals (list): list of refined parameter values
+        refp_uncs (list): list of refined parameter uncertainties
+        unrefined_params (list): list of strings of unrefined parameter names
+        unrefp_vals (list): list of unrefined parameter values
+        unrefp_uncs (list): list of unrefined parameter uncertainties
+        macro_name (str): name of macro (for unnamed parameters)
+        macro_count (int): counter for unnamed parameters
+        refined (bool): determines whether next parameter is refined or not
+        need_name (bool): determines whether next parameter needs a name 
+        generated or otherwise
+    Returns:
+        end_value (bool): if True, end of macro has been found
+        ms_count (int): updated ms_count counter
+        new_exp_val: updated exp_val boolean
+        macro_count (int): updated macro_count counter
+        refined (bool): updated refined boolean
+        refined_params (list): updated refined parameters
+        refp_vals (list): updated refined values
+        refp_uncs (list): updated refined uncertainties
+        unrefined_params (list): updated unrefined parameters
+        unrefp_vals (list): updated unrefined values
+        unrefp_uncs (list): updated unrefined uncertainties
+    """
+    new_exp_val = False
+    end_value = False
+    s_split = s.split(',')
+    refined = False
+    if 1 in macro_structure:
+        gen_names = False
+    else:
+        gen_names = True
+    if s[-1] == ',':
+        del s_split[-1]
+        new_exp_val = True
+    elif s[-1] == ')':
+        end_value = True
+    if not exp_val and s[0] == ',':
+        del s_split[0]
+    for ss in s_split:
+        if macro_structure[ms_count] == 1:
+            if ss == '':
+                p_name = macro_name + str(macro_count)
+                macro_count += 1
+                unrefined_params.append(p_name)
+                refined = False
+            elif ss[0] == '!':
+                p_name = ss[1:]
+                unrefined_params.append(p_name)
+                refined = False
+            elif ss[0] == '@':
+                p_name = macro_name + str(macro_count)
+                macro_count += 1
+                refined_params.append(p_name)
+                refined = True
+            else:
+                refined_params.append(ss)
+                refined = True
+        elif macro_structure[ms_count] == 2:
+            if gen_names:
+                if ss[0] == '!' or ss[0].isalpha():
+                    if ss[0] == '!':
+                        unrefined_params.append(ss[1:])
+                        refined = False
+                    else:
+                        refined_params.append(ss)
+                        refined = True
+                    need_name = False
+                else:
+                    if need_name:
+                        p_name = macro_name + str(macro_count)
+                        macro_count += 1
+                        unrefined_params.append(p_name)
+                        refined = False
+                    p, u = extract_params(ss)
+                    if refined:
+                        refp_vals.append(p)
+                        refp_uncs.append(u)
+                    else:
+                        unrefp_vals.append(p)
+                        unrefp_uncs.append(u)
+                    need_name = True
+            else:
+                p, u = extract_params(ss)
+                if refined:
+                    refp_vals.append(p)
+                    refp_uncs.append(u)
+                else:
+                    unrefp_vals.append(p)
+                    unrefp_uncs.append(u)
+                refined = False
+        ms_count += 1
+    return end_value, ms_count, new_exp_val, macro_count, refined_params, \
+           refp_vals, refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs
 
 #parameter names/values to record
 bkg_count = 0
@@ -164,6 +286,10 @@ single_keys = ['continue_after_convergence', 'do_errors', 'str',
 extract_keys = ['prm']
 struc_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'volume', 'scale']
 site_keys = ['x', 'y', 'z', 'beq']
+#macro keys are at the top of the file (so users will know the structure for
+#putting in their own macros).
+macro_counts = [0 for s in macro_keys]
+macro_prms = []
 #counting the number of times extra_values occur (for multiple r_wps etc.)
 count_extra = [0 for s in extra_values]
 count_extract = [0 for s in extract_keys]
@@ -190,7 +316,7 @@ with open(fpath, 'r') as f:
                 continue
             ifdef = is_ifdef(s)
             define = is_define(s)
-            #find macros and ignore
+            #find macro definitions and ignore
             if macro:
                 if l[-1] == '}':
                     macro = False
@@ -337,9 +463,10 @@ with open(fpath, 'r') as f:
                 p_name = '_'.join([ph_name, current_site]) + '_occ'
             if l == 'occ':
                 occ = True
+            #recognize macros
             
             #This breaks the line when a ' comment out has been used
             if break_bool:
                 break
 ##############STILL to do
-#(i) deal with site keys; (ii) deal with phase names when they're strings.                
+#(i) Recognize macros and extract their parameters...             
