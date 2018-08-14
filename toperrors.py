@@ -168,18 +168,18 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
         ms_count (int): updated ms_count counter
         new_exp_val: updated exp_val boolean
         macro_count (int): updated macro_count counter
-        refined (bool): updated refined boolean
         refined_params (list): updated refined parameters
         refp_vals (list): updated refined values
         refp_uncs (list): updated refined uncertainties
         unrefined_params (list): updated unrefined parameters
         unrefp_vals (list): updated unrefined values
         unrefp_uncs (list): updated unrefined uncertainties
+        refined (bool): updated refined boolean
+        need_name (bool): updated need_name boolean
     """
     new_exp_val = False
     end_value = False
     s_split = s.split(',')
-    refined = False
     if 1 in macro_structure:
         gen_names = False
     else:
@@ -192,6 +192,9 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
     if not exp_val and s[0] == ',':
         del s_split[0]
     for ss in s_split:
+#        print('s_split string: %s' % ss)
+        if len(macro_structure) == ms_count:
+            break
         if macro_structure[ms_count] == 1:
             if ss == '':
                 p_name = macro_name + str(macro_count)
@@ -245,8 +248,67 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                 refined = False
         ms_count += 1
     return end_value, ms_count, new_exp_val, macro_count, refined_params, \
-           refp_vals, refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs
+           refp_vals, refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
+           refined, need_name
 
+def test_macro_func(test_num=0):
+    tests = ['prm_name, 24.0_1.3, prm_name2, 32.0)', 
+             'prm_name , 24.0_1.3 , prm_name2 , 32.0 )',
+             '@ , 24.0_1.3, @, 32.0)',
+             ' , 24.0_1.3, , 32.0 )',
+             ' , 24.0_1.3, !prm_name, 32.0_14.3)']
+    strucs = [[1, 2, 1, 2],
+              [1, 2, 1, 2],
+              [1, 2, 1, 2],
+              [1, 2, 1, 2],
+              [1, 2, 1, 2],
+              [1, 2, 1, 2]]
+    inputs = [(0, 0, False, False, False, [], [], [], [], [], []),
+              (0, 0, False, False, False, [], [], [], [], [], []),
+              (0, 0, False, False, False, [], [], [], [], [], []),
+              (0, 0, True, False, False, [], [], [], [], [], []),
+              (0, 0, True, False, False, [], [], [], [], [], [])]
+    outputs = [(True, 4, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
+                [1.3, 0.], [], [], [], False, False),
+               (True, 4, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
+                [1.3, 0.], [], [], [], False, False),
+               (True, 4, False, 2, ['mn0', 'mn1'], [24.0, 32.0],
+                [1.3, 0.], [], [], [], False, False),
+               (True, 4, False, 2, [], [],
+                [], ['mn0', 'mn1'], [24.0, 32.0], [1.3, 0.], False, False),
+               (True, 4, False, 1, [], [], [], ['mn0', 'prm_name'],
+                [24.0, 32.0], [1.3, 14.3], False, False),
+              ]
+    test = tests[test_num].split()
+    ms_count, macro_count, exp_val, refined, nn, rpn, rpv, rpu, upn, upv, upu\
+    = inputs[test_num]
+    struc = strucs[test_num]
+    for t in test:
+#        print(t)
+#        print('%s, %s, %s, %s, %s' % (ms_count, exp_val, macro_count,
+#                                          refined, nn))
+        ev, ms_count, exp_val, macro_count, rpn, rpv, rpu, upn, upv, upu,\
+        refined, nn = extract_macro_value(t, ms_count, struc, exp_val, rpn, 
+                                          rpv, rpu, upn, upv, upu, 'mn', 
+                                          macro_count, refined, nn)
+#        print('%s, %s, %s, %s, %s, %s' % (ev, ms_count, exp_val, macro_count,
+#                                          refined, nn))
+#        print(upn)
+    #check against outputs
+    output = outputs[test_num]
+    new_output = [ev, ms_count, exp_val, macro_count, rpn, rpv, rpu,
+                  upn, upv, upu, refined, nn]
+    bools = []
+    for i, o in enumerate(output):
+        bools.append(new_output[i] == o)
+    if all(bools):
+        print("Expected output")
+    else:
+        print("Unexpected output")
+    return bools, new_output, test
+    
+        
+"""
 #parameter names/values to record
 bkg_count = 0
 unnamed_count = 0
@@ -468,5 +530,9 @@ with open(fpath, 'r') as f:
             #This breaks the line when a ' comment out has been used
             if break_bool:
                 break
+            """
 ##############STILL to do
-#(i) Recognize macros and extract their parameters...             
+#(1) Cope with [1, 1, 1, 2, 2, 2] type macro_structures
+#(2) Integrate extract_macro_value with main with statement
+#(3) Put with statement into a function
+#(4) Make good for multiple files
