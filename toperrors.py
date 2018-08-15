@@ -33,8 +33,8 @@ macro_structures = [[2], [2, 2], [2, 2], [2, 2],
 #(1) macro ending brackets must be followed by a space or newline character
 #(2) in macro_structures if there are any 1s, then there must be an equal
 #number of 2s.
-#(3) no equations with other parameter names in parameter value fields (this is
-#just too complicated to parse)
+#(3) no equations (this is just too complicated to parse)
+#(4) no min or max within macros (if you're desperate just use the prm keyword)
 
 def line_comment(s, ignore):
     """Looks for ' and returns (modified) string and break_bool"""
@@ -128,7 +128,7 @@ def extract_params(s):
 def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                         refp_vals, refp_uncs, unrefined_params, unrefp_vals,
                         unrefp_uncs, macro_name, macro_count, refined=[],
-                        need_name=True):
+                        need_name=True, ignores=[]):
     """Return parameter value and uncertainty from string
     
     Args:
@@ -150,6 +150,7 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
         or not.
         need_name (bool): determines whether next parameter needs a name 
         generated or otherwise
+        ignores (list): booleans for whether parameter is elsewhere defined
     Returns:
         end_value (bool): if True, end of macro has been found
         ms_count (int): updated ms_count counter
@@ -163,6 +164,7 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
         unrefp_uncs (list): updated unrefined uncertainties
         refined (list): updated list of refined booleans
         need_name (bool): updated need_name boolean
+        ignores (list): updated ignore list
     """
     print(s)
     new_exp_val = False
@@ -192,27 +194,45 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                 macro_count += 1
                 unrefined_params.append(p_name)
                 refined.append(False)
+                ignores.append(False)
             elif ss[0] == '!':
                 p_name = ss[1:]
-                unrefined_params.append(p_name)
-                refined.append(False)
+                if p_name in unrefined_params:
+                    ignores.append(True)
+                else:
+                    unrefined_params.append(p_name)
+                    refined.append(False)
+                    ignores.append(False)
             elif ss[0] == '@':
                 p_name = macro_name + str(macro_count)
                 macro_count += 1
                 refined_params.append(p_name)
                 refined.append(True)
+                ignores.append(False)
             else:
-                refined_params.append(ss)
-                refined.append(True)
+                if ss in refined_params:
+                    ignores.append(True)
+                else:
+                    refined_params.append(ss)
+                    refined.append(True)
+                    ignores.append(False)
         elif macro_structure[ms_count] == 2:
             if gen_names:
                 if ss[0] == '!' or ss[0].isalpha():
                     if ss[0] == '!':
-                        unrefined_params.append(ss[1:])
-                        refined.append(False)
+                        if ss[1:] in unrefined_params:
+                            ignores.append(True)
+                        else:
+                            unrefined_params.append(ss[1:])
+                            refined.append(False)
+                            ignores.append(False)
                     else:
-                        refined_params.append(ss)
-                        refined.append(True)
+                        if ss in refined_params:
+                            ignores.append(True)
+                        else:
+                            refined_params.append(ss)
+                            refined.append(True)
+                            ignores.append(False)
                     need_name = False
                 else:
                     if need_name:
@@ -220,6 +240,20 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                         macro_count += 1
                         unrefined_params.append(p_name)
                         refined.append(False)
+                    if not ignores or not ignores[0]:
+                        p, u = extract_params(ss)
+                        if refined[0]:
+                            refp_vals.append(p)
+                            refp_uncs.append(u)
+                        else:
+                            unrefp_vals.append(p)
+                            unrefp_uncs.append(u)
+                        del refined[0]
+                        need_name = True
+                    if ignores:
+                        del ignores[0]
+            else:
+                if not ignores or not ignores[0]:
                     p, u = extract_params(ss)
                     if refined[0]:
                         refp_vals.append(p)
@@ -228,23 +262,16 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                         unrefp_vals.append(p)
                         unrefp_uncs.append(u)
                     del refined[0]
-                    need_name = True
-            else:
-                p, u = extract_params(ss)
-                if refined[0]:
-                    refp_vals.append(p)
-                    refp_uncs.append(u)
-                else:
-                    unrefp_vals.append(p)
-                    unrefp_uncs.append(u)
-                del refined[0]
+                if ignores:
+                    del ignores[0]
         if i < len(s_split)-1:
             ms_count += 1
     if s.count(',') >= len(s_split):
         ms_count += 1
     output = end_value, ms_count, new_exp_val, macro_count, refined_params, \
            refp_vals, refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-           refined, need_name
+           refined, need_name, ignores   
+    print(output)
     return output
 
 def test_macro_func(test_num=0):
@@ -256,7 +283,8 @@ def test_macro_func(test_num=0):
              ' 24.0 ,32.0)',
              '!prm_name 24.0, !prm_name2 32.0)',
              '!prm_name 24.0,!prm_name2 32.0)',
-             'prm_name,24.0_1.3,prm_name2,32.0)',]
+             'prm_name,24.0_1.3,prm_name2,32.0)',
+             'prm_n, 24.0_1.3, prm_n2, 32.0)', ]
     strucs = [[1, 2, 1, 2],
               [1, 2, 1, 2],
               [1, 2, 1, 2],
@@ -265,55 +293,60 @@ def test_macro_func(test_num=0):
               [2, 2],
               [2, 2],
               [2, 2],
-              [1, 2, 1, 2]]
-    inputs = [(0, 0, False, [], True, [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], []),
-              (0, 0, True, [], True, [], [], [], [], [], []),
-              (0, 0, True, [], True, [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], []),]
+              [1, 2, 1, 2],
+              [1, 2, 1, 2],]
+    inputs = [(0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, True, [], True, [], [], [], [], [], [], []),
+              (0, 0, True, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, [], [], [], [], [], [], []),
+              (0, 0, False, [], True, ['prm_n'], [2.0], [0.0], [], [], [], []),
+              ]
     outputs = [(True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True),
+                [1.3, 0.], [], [], [], [], True, []),
                (True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True),
+                [1.3, 0.], [], [], [], [], True, []),
                (True, 3, False, 2, ['mn0', 'mn1'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True),
+                [1.3, 0.], [], [], [], [], True, []),
                (True, 3, False, 2, [], [], [], ['mn0', 'mn1'], [24.0, 32.0], 
-                [1.3, 0.], [], True),
+                [1.3, 0.], [], True, []),
                (True, 3, False, 1, [], [], [], ['mn0', 'prm_name'],
-                [24.0, 32.0], [1.3, 14.3], [], True),
+                [24.0, 32.0], [1.3, 14.3], [], True, []),
                (True, 1, False, 2, [], [], [], ['mn0', 'mn1'], [24.0, 32.0],
-                [0.0, 0.0], [], True),
+                [0.0, 0.0], [], True, []),
                (True, 1, False, 0, [], [], [], ['prm_name', 'prm_name2'], 
-                [24.0, 32.0], [0.0, 0.0], [], True),
+                [24.0, 32.0], [0.0, 0.0], [], True, []),
                (True, 1, False, 0, [], [], [], ['prm_name', 'prm_name2'], 
-                [24.0, 32.0], [0.0, 0.0], [], True),
+                [24.0, 32.0], [0.0, 0.0], [], True, []),
                (True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True),
+                [1.3, 0.], [], [], [], [], True, []),
+               (True, 3, False, 0, ['prm_n', 'prm_n2'], [2.0, 32.0],
+                [0., 0.], [], [], [], [], True, []),
               ]
     test = tests[test_num].split()
-    ms_count, macro_count, exp_val, refined, nn, rpn, rpv, rpu, upn, upv, upu\
-    = inputs[test_num]
+    ms_count, macro_count, exp_val, refined, nn, rpn, rpv, rpu, upn, upv, upu,\
+    ignores = inputs[test_num]
     struc = strucs[test_num]
     for t in test:
 #        print(t)
 #        print('%s, %s, %s, %s, %s' % (ms_count, exp_val, macro_count,
 #                                          refined, nn))
         ev, ms_count, exp_val, macro_count, rpn, rpv, rpu, upn, upv, upu,\
-        refined, nn = extract_macro_value(t, ms_count, struc, exp_val, rpn, 
+        refined, nn, ignores = extract_macro_value(t, ms_count, struc, exp_val, rpn, 
                                           rpv, rpu, upn, upv, upu, 'mn', 
-                                          macro_count, refined, nn)
-#        print('%s, %s, %s, %s, %s, %s' % (ev, ms_count, exp_val, macro_count,
-#                                          refined, nn))
+                                          macro_count, refined, nn, ignores)
+#        print('%s, %s, %s, %s, %s, %s %s' % (ev, ms_count, exp_val, macro_count,
+#                                             refined, nn, ignores))
 #        print(upn)
 #        print(upv)
     #check against outputs
     output = outputs[test_num]
     new_output = [ev, ms_count, exp_val, macro_count, rpn, rpv, rpu,
-                  upn, upv, upu, refined, nn]
+                  upn, upv, upu, refined, nn, ignores]
     bools = []
     for i, o in enumerate(output):
         bools.append(new_output[i] == o)
