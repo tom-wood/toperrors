@@ -357,7 +357,7 @@ def test_macro_func(test_num=0):
     return bools, new_output, test
     
         
-"""
+
 #parameter names/values to record
 bkg_count = 0
 unnamed_count = 0
@@ -387,20 +387,14 @@ struc = False
 phase_name = False
 #flags for finding macros
 macro = False
+macro_k = False
 #keywords
-ignore_keys = ['xdd', 'r_wp', 'r_exp', 'gof', 'r_exp_dash', 'r_wp_dash',
-               'r_p_dash', 'weighted_Durbin_Watson', 
-               'penalties_weighting_K1', 'start_X', 'finish_X', 'fit_obj', 
-               'Rp', 'Rs', 'lam', 'la', 'lo', 'lh', 'lg', 'x_calculation_step']
-single_keys = ['continue_after_convergence', 'do_errors', 'str',  
-               'view_structure', 'Dummy_Peak_Shape',]
 extract_keys = ['prm']
 struc_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'volume', 'scale']
 site_keys = ['x', 'y', 'z', 'beq']
 #macro keys are at the top of the file (so users will know the structure for
 #putting in their own macros).
 macro_counts = [0 for s in macro_keys]
-macro_prms = []
 #counting the number of times extra_values occur (for multiple r_wps etc.)
 count_extra = [0 for s in extra_values]
 count_extract = [0 for s in extract_keys]
@@ -575,13 +569,42 @@ with open(fpath, 'r') as f:
             if l == 'occ':
                 occ = True
             #recognize macros
-            
+            if macro_k:
+                ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
+                refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
+                refined_bools, nn, ignores = extract_macro_value(l, ms_count,\
+                    struc, exp_val, refined_params, refp_vals, refp_uncs,\
+                    unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
+                    macro_count, refined_bools, nn, ignores)
+                if ev:
+                    macro_k = False
+            if l.split('(')[0] in macro_keys:
+                macro_k = True
+                macro_i = macro_keys.index(l.split('(')[0])
+                ms_count = 0
+                struc = macro_structures[macro_i]
+                macro_name = macro_keys[macro_i]
+                macro_count = 0
+                refined_bools = []
+                nn = True
+                ignores = []
+                ms = l.split('(')[1]
+                if ms == ',':
+                    exp_val = True
+                else:
+                    exp_val = False
+                ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
+                refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
+                refined_bools, nn, ignores = extract_macro_value(ms, ms_count,\
+                    struc, exp_val, refined_params, refp_vals, refp_uncs,\
+                    unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
+                    macro_count, refined_bools, nn, ignores)
+                if ev:
+                    macro_k = False
             #This breaks the line when a ' comment out has been used
             if break_bool:
                 break
-            """
+            
 ##############STILL to do
-#(1) Cope with [1, 1, 1, 2, 2, 2] type macro_structures
-#(2) Integrate extract_macro_value with main with statement
 #(3) Put with statement into a function
 #(4) Make good for multiple files
