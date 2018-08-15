@@ -12,8 +12,6 @@ fpath = "C:/Users/vgx18551/Documents/Data/Polaris_Jun18_Faradion_cathode"
 fpath += "/Standards/POL109230-NBS-640b-Si-Riet-01.inp"
 
 extra_values = ['r_wp', 't2', 'mu0', 'mu1']
-#extract_all = False
-
 macro_keys = ['Cubic', 'Tetragonal', 'Hexagonal', 'Rhombohedral',
               'TOF_Strain_L', 'TOF_Strain_G', 'TOF_CS_L', 'TOF_CS_G',
               'Strain_L', 'Strain_G', 'CS_L', 'CS_G',
@@ -106,10 +104,6 @@ def set_ignoredef(s, ifdef, defines, ignoredef, endif):
 def is_bkg(s):
     """Return boolean depending on whether string indicates bkg"""
     return s == 'bkg'
-
-def is_prm(s):
-    """Return boolean depending on whether string indicates prm"""
-    return s == 'prm'
 
 def extract_params(s):
     """Return parameter value and uncertainty from string"""
@@ -357,253 +351,255 @@ def test_macro_func(test_num=0):
     return bools, new_output, test
     
         
-
-#parameter names/values to record
-bkg_count = 0
-unnamed_count = 0
-refined_params = []
-refp_vals = []
-refp_uncs = []
-unrefined_params = []
-unrefp_vals = []
-unrefp_uncs = []
-defines = []
-#flags for finding comments and comment blocks
-ignore = False 
-ignoredef = False 
-define = False 
-ifdef = False 
-endif = False
-#flags for finding parameters
-bkg = False
-refined = False
-equal_defer = False
-semicolon = False
-extract_next = False
-occ = False
-site = False
-site_name = False
-struc = False
-phase_name = False
-#flags for finding macros
-macro = False
-macro_k = False
-#keywords
-extract_keys = ['prm']
-struc_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'volume', 'scale']
-site_keys = ['x', 'y', 'z', 'beq']
-#macro keys are at the top of the file (so users will know the structure for
-#putting in their own macros).
-macro_counts = [0 for s in macro_keys]
-#counting the number of times extra_values occur (for multiple r_wps etc.)
-count_extra = [0 for s in extra_values]
-count_extract = [0 for s in extract_keys]
-#count number of phases
-phase_count = 0
-
-with open(fpath, 'r') as f:
-    for i, line in enumerate(f):
-        for l in line.split():
-            s, break_bool = line_comment(l, ignore)
-            if not break_bool:
-                s, ignore, continue_bool = block_comment(s, ignore)
+def get_values(fpath, extra_values, macro_keys, macro_structures):
+    """Extract all parameter values and uncertainties"""
+    #parameter names/values to record
+    bkg_count = 0
+    refined_params = []
+    refp_vals = []
+    refp_uncs = []
+    unrefined_params = []
+    unrefp_vals = []
+    unrefp_uncs = []
+    defines = []
+    #flags for finding comments and comment blocks
+    ignore = False 
+    ignoredef = False 
+    define = False 
+    ifdef = False 
+    endif = False
+    #flags for finding parameters
+    bkg = False
+    refined = False
+    equal_defer = False
+    semicolon = False
+    extract_next = False
+    occ = False
+    site = False
+    site_name = False
+    struc = False
+    phase_name = False
+    #flags for finding macros
+    macro = False
+    macro_k = False
+    #keywords
+    extract_keys = ['prm']
+    struc_keys = ['a', 'b', 'c', 'al', 'be', 'ga', 'volume', 'scale']
+    site_keys = ['x', 'y', 'z', 'beq']
+    #macro keys are at the top of the file (so users will know the structure for
+    #putting in their own macros).
+    macro_counts = [0 for s in macro_keys]
+    #counting the number of times extra_values occur (for multiple r_wps etc.)
+    count_extra = [0 for s in extra_values]
+    count_extract = [0 for s in extract_keys]
+    #count number of phases
+    phase_count = 0
+    
+    with open(fpath, 'r') as f:
+        for i, line in enumerate(f):
+            for l in line.split():
+                s, break_bool = line_comment(l, ignore)
+                if not break_bool:
+                    s, ignore, continue_bool = block_comment(s, ignore)
+                    if continue_bool:
+                        continue
+                #sort out ifdefs here
+                if define:
+                    defines.append(s)
+                ignoredef, continue_bool = set_ignoredef(s, ifdef, defines, 
+                                                         ignoredef, endif)
+                ifdef = False #reset ifdef
+                #actually reading the string here
+                endif = is_endif(s)
                 if continue_bool:
                     continue
-            #sort out ifdefs here
-            if define:
-                defines.append(s)
-            ignoredef, continue_bool = set_ignoredef(s, ifdef, defines, 
-                                                     ignoredef, endif)
-            ifdef = False #reset ifdef
-            #actually reading the string here
-            endif = is_endif(s)
-            if continue_bool:
-                continue
-            ifdef = is_ifdef(s)
-            define = is_define(s)
-            #find macro definitions and ignore
-            if macro:
-                if l[-1] == '}':
-                    macro = False
-                continue
-            if l == 'macro':
-                macro = True
-            #work out background parameters
-            if bkg:
-                if l == '@':
-                    refined = True
+                ifdef = is_ifdef(s)
+                define = is_define(s)
+                #find macro definitions and ignore
+                if macro:
+                    if l[-1] == '}':
+                        macro = False
                     continue
-                elif l[0].isalpha() == False:
-                    p, u = extract_params(l)
-                    p_name = 'bkg' + str(bkg_count)
-                    bkg_count += 1
-                    if refined:
-                        refp_vals.append(p)
-                        refp_uncs.append(u)
-                        refined_params.append(p_name)
-                    else:
-                        unrefp_vals.append(p)
-                        unrefp_uncs.append(u)
-                        unrefined_params.append(p_name)
-                    continue
-            refined = False
-            bkg = is_bkg(l)
-            #work out prm parameters
-            if extract_next:
-                if l == '@':                  
-                    refined = True
-                    continue
-                else:
-                    if l[0] == '!':
-                        p_name = l[1:]
+                if l == 'macro':
+                    macro = True
+                #work out background parameters
+                if bkg:
+                    if l == '@':
+                        refined = True
                         continue
-                    elif l[0].isalpha():
-                        if equal_defer:
-                            continue
+                    elif l[0].isalpha() == False:
+                        p, u = extract_params(l)
+                        p_name = 'bkg' + str(bkg_count)
+                        bkg_count += 1
+                        if refined:
+                            refp_vals.append(p)
+                            refp_uncs.append(u)
+                            refined_params.append(p_name)
                         else:
-                            if semicolon:
-                                semicolon = False
-                                prm = False
+                            unrefp_vals.append(p)
+                            unrefp_uncs.append(u)
+                            unrefined_params.append(p_name)
+                        continue
+                refined = False
+                bkg = is_bkg(l)
+                #work out prm parameters
+                if extract_next:
+                    if l == '@':                  
+                        refined = True
+                        continue
+                    else:
+                        if l[0] == '!':
+                            p_name = l[1:]
+                            continue
+                        elif l[0].isalpha():
+                            if equal_defer:
                                 continue
                             else:
-                                refined = True
-                                p_name = l
+                                if semicolon:
+                                    semicolon = False
+                                    continue
+                                else:
+                                    refined = True
+                                    p_name = l
+                                continue
+                        elif l[0] == '=':
+                            equal_defer = True
+                            if l[-1] == ';':
+                                equal_defer = False
+                                semicolon = True
                             continue
-                    elif l[0] == '=':
-                        equal_defer = True
-                        if l[-1] == ';':
+                        elif l[0] == ';':
                             equal_defer = False
                             semicolon = True
-                        continue
-                    elif l[0] == ';':
-                        equal_defer = False
-                        semicolon = True
-                        continue
-                    elif l[0] == '-' or l[0].isdigit():
-                        if equal_defer:
+                            continue
+                        elif l[0] == '-' or l[0].isdigit():
+                            if equal_defer:
+                                if l[-1] == ';':
+                                    semicolon = True
+                                    equal_defer = False
+                                continue
+                            else:
+                                p, u = extract_params(l)
+                                if refined:
+                                    refined_params.append(p_name)
+                                    refp_vals.append(p)
+                                    refp_uncs.append(u)
+                                    refined = False
+                                else:
+                                    unrefined_params.append(p_name)
+                                    unrefp_vals.append(p)
+                                    unrefp_uncs.append(u)  
+                                    print('%s added on line %d' %(p_name, i+1))
+                                semicolon = False
+                                extract_next = False
+                        elif l[0] == ':':
+                            if semicolon:
+                                continue
+                        else:
                             if l[-1] == ';':
                                 semicolon = True
                                 equal_defer = False
                             continue
+                if l in extra_values:
+                    print('%s extra value' % l)
+                    extract_next = True
+                    p_name = l
+                    d = extra_values.index(l)
+                    if count_extra[d] != 0:
+                        p_name += str(count_extra[d])
+                    count_extra[d] += 1
+                if l in extract_keys:
+                    print('%s extract key' % l)
+                    extract_next = True
+                    p_name = l + str(count_extract[extract_keys.index(l)])
+                    count_extract[extract_keys.index(l)] += 1
+                #deal with structures, sites and occupancies
+                if l == 'str':
+                    site = False
+                    ph_name = 'phase' + str(phase_count)
+                    phase_count += 1
+                    struc = True
+                if phase_name:
+                    if l[-1] == ')':
+                        ph_name = l[:-1]
+                    else:
+                        ph_name = l
+                    if ph_name[0] and ph_name[-1] == '"':
+                        ph_name = ph_name[1:-1]
+                    phase_name = False
+                if l[:4] == 'STR(':
+                    struc = True
+                    if ',' in l and len(l.split(',')[1]) > 1:
+                        if l.split(',')[1][-1] == ')':
+                            ph_name = l.split(',')[1][-1][:-1]
                         else:
-                            p, u = extract_params(l)
-                            if refined:
-                                refined_params.append(p_name)
-                                refp_vals.append(p)
-                                refp_uncs.append(u)
-                                refined = False
-                            else:
-                                unrefined_params.append(p_name)
-                                unrefp_vals.append(p)
-                                unrefp_uncs.append(u)  
-                                print('%s added on line %d' %(p_name, i+1))
-                            semicolon = False
-                            extract_next = False
-                    elif l[0] == ':':
-                        if semicolon:
-                            continue
+                            ph_name = l.split(',')[1][-1]
                     else:
-                        if l[-1] == ';':
-                            semicolon = True
-                            equal_defer = False
-                        continue
-            #prm = is_prm(l)
-            if l in extra_values:
-                print('%s extra value' % l)
-                extract_next = True
-                p_name = l
-                d = extra_values.index(l)
-                if count_extra[d] != 0:
-                    p_name += str(count_extra[d])
-                count_extra[d] += 1
-            if l in extract_keys:
-                print('%s extract key' % l)
-                extract_next = True
-                p_name = l + str(count_extract[extract_keys.index(l)])
-                count_extract[extract_keys.index(l)] += 1
-            #deal with structures, sites and occupancies
-            if l == 'str':
-                site = False
-                ph_name = 'phase' + str(phase_count)
-                phase_count += 1
-                struc = True
-            if phase_name:
-                if l[-1] == ')':
-                    ph_name = l[:-1]
-                else:
-                    ph_name = l
-                if ph_name[0] and ph_name[-1] == '"':
-                    ph_name = ph_name[1:-1]
-                phase_name = False
-            if l[:4] == 'STR(':
-                struc = True
-                if ',' in l and len(l.split(',')[1]) > 1:
-                    if l.split(',')[1][-1] == ')':
-                        ph_name = l.split(',')[1][-1][:-1]
+                        phase_name = True
+                if struc:
+                    if l == 'phase_name':
+                        phase_name = True
+                    elif l in struc_keys:
+                        p_name = '_'.join([ph_name, l])
+                        print('%s struc key' % l)
+                        extract_next = True
+                if site_name:
+                    current_site = l
+                    site_name = False
+                if site:
+                    if l in site_keys:
+                        p_name = '_'.join([ph_name, current_site, l])
+                        print('%s site key' % l)
+                        extract_next = True
+                if l == 'site':
+                    site = True
+                    site_name = True
+                if occ:
+                    extract_next = True
+                    occ = False
+                    p_name = '_'.join([ph_name, current_site]) + '_occ'
+                if l == 'occ':
+                    occ = True
+                #recognize macros
+                if macro_k:
+                    ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
+                    refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
+                    refined_bools, nn, ignores = extract_macro_value(l, ms_count,\
+                        struc, exp_val, refined_params, refp_vals, refp_uncs,\
+                        unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
+                        macro_count, refined_bools, nn, ignores)
+                    if ev:
+                        macro_k = False
+                if l.split('(')[0] in macro_keys:
+                    macro_k = True
+                    macro_i = macro_keys.index(l.split('(')[0])
+                    ms_count = 0
+                    struc = macro_structures[macro_i]
+                    macro_name = macro_keys[macro_i]
+                    macro_count = macro_counts[macro_i]
+                    refined_bools = []
+                    nn = True
+                    ignores = []
+                    ms = l.split('(')[1]
+                    if ms == ',':
+                        exp_val = True
                     else:
-                        ph_name = l.split(',')[1][-1]
-                else:
-                    phase_name = True
-            if struc:
-                if l == 'phase_name':
-                    phase_name = True
-                elif l in struc_keys:
-                    p_name = '_'.join([ph_name, l])
-                    print('%s struc key' % l)
-                    extract_next = True
-            if site_name:
-                current_site = l
-                site_name = False
-            if site:
-                if l in site_keys:
-                    p_name = '_'.join([ph_name, current_site, l])
-                    print('%s site key' % l)
-                    extract_next = True
-            if l == 'site':
-                site = True
-                site_name = True
-            if occ:
-                extract_next = True
-                occ = False
-                p_name = '_'.join([ph_name, current_site]) + '_occ'
-            if l == 'occ':
-                occ = True
-            #recognize macros
-            if macro_k:
-                ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
-                refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-                refined_bools, nn, ignores = extract_macro_value(l, ms_count,\
-                    struc, exp_val, refined_params, refp_vals, refp_uncs,\
-                    unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
-                    macro_count, refined_bools, nn, ignores)
-                if ev:
-                    macro_k = False
-            if l.split('(')[0] in macro_keys:
-                macro_k = True
-                macro_i = macro_keys.index(l.split('(')[0])
-                ms_count = 0
-                struc = macro_structures[macro_i]
-                macro_name = macro_keys[macro_i]
-                macro_count = 0
-                refined_bools = []
-                nn = True
-                ignores = []
-                ms = l.split('(')[1]
-                if ms == ',':
-                    exp_val = True
-                else:
-                    exp_val = False
-                ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
-                refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-                refined_bools, nn, ignores = extract_macro_value(ms, ms_count,\
-                    struc, exp_val, refined_params, refp_vals, refp_uncs,\
-                    unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
-                    macro_count, refined_bools, nn, ignores)
-                if ev:
-                    macro_k = False
-            #This breaks the line when a ' comment out has been used
-            if break_bool:
-                break
+                        exp_val = False
+                    ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
+                    refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
+                    refined_bools, nn, ignores = extract_macro_value(ms, ms_count,\
+                        struc, exp_val, refined_params, refp_vals, refp_uncs,\
+                        unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
+                        macro_count, refined_bools, nn, ignores)
+                    if ev:
+                        macro_counts[macro_i] = macro_count
+                        macro_k = False
+                #This breaks the line when a ' comment out has been used
+                if break_bool:
+                    break
+    output = (refined_params, refp_vals, refp_uncs, unrefined_params,
+              unrefp_vals, unrefp_uncs)
+    return output
             
 ##############STILL to do
 #(3) Put with statement into a function
