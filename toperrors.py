@@ -67,27 +67,15 @@ def block_comment(s, ignore):
 
 def is_define(s):
     """Return bool for whether s is a define statement"""
-    if s == '#define':
-        res = True
-    else:
-        res = False
-    return res
+    return s == '#define'
 
 def is_ifdef(s):
     """Return bool for whether s is an ifdef statement"""
-    if s == '#ifdef':
-        res = True
-    else:
-        res = False
-    return res
+    return s == '#ifdef'
 
 def is_endif(s):
     """Return bool for whether s is an endif statement"""
-    if s == '#endif':
-        res = True
-    else:
-        res = False
-    return res
+    return s == '#endif'
 
 def set_ignoredef(s, ifdef, defines, ignoredef, endif):
     """Sets flags for whether in a non-defined block or not"""
@@ -113,17 +101,11 @@ def set_ignoredef(s, ifdef, defines, ignoredef, endif):
 
 def is_bkg(s):
     """Return boolean depending on whether string indicates bkg"""
-    if s == 'bkg':
-        return True
-    else:
-        return False
+    return s == 'bkg'
 
 def is_prm(s):
     """Return boolean depending on whether string indicates prm"""
-    if s == 'prm':
-        return True
-    else:
-        return False
+    return s == 'prm'
 
 def extract_params(s):
     """Return parameter value and uncertainty from string"""
