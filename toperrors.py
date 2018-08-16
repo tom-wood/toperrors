@@ -672,10 +672,12 @@ def find_extra_values(extra_values, params):
     evis, evals = [], []
     for ev in extra_values:
         for i, p in enumerate(params):
-            #next if statement conditional on no parameter name overlap
             if len(p) >= len(ev) and p[:len(ev)] == ev:
-                evis.append(i)
-                evals.append(p)
+                p_bs = [True if s.isdigit() or s == '_' else False for s in
+                        p[len(ev):]]                        
+                if all(p_bs):
+                    evis.append(i)
+                    evals.append(p)
     return evis, evals
                 
 def get_multiple_values(out_name, fnames, extra_values, macro_keys,
