@@ -392,8 +392,19 @@ def test_macro_func(test_num=0):
     return bools, new_output, test
     
         
-def get_values(fpath, extra_values, macro_keys, macro_structures):
-    """Extract all parameter values and uncertainties"""
+def get_values(fpath, extra_values, macro_keys, macro_structures,
+               ignore_bkg=True):
+    """Extract all parameter values and uncertainties
+    
+    Args:
+        fpath (str): filepath of file to read for values
+        extra_values (list): list of extra values unlikely to be picked up as
+        refined or unrefined parameters (e.g. gof and r_wp).
+        macro_keys (list): list of macro keywords
+        macro_structures (list): list of macro structures for each macro
+        keyword.
+        ignore_bkg (bool): determines whether to extract bkg parameters or not
+    """
     #parameter names/values to record
     bkg_count = 0
     refined_params = []
@@ -482,7 +493,8 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                             unrefp_uncs.append(u)
                             unrefined_params.append(p_name)
                         continue
-                bkg = is_bkg(l)
+                if not ignore_bkg:
+                    bkg = is_bkg(l)
                 #work out prm parameters
                 if extract_next:
                     if l == '@':                  
@@ -668,7 +680,7 @@ def find_extra_values(extra_values, params):
                 
 def get_multiple_values(out_name, fnames, extra_values, macro_keys,
                         macro_structures, save_all=False, append=False,
-                        print_warnings=True, interleave=True):
+                        print_warnings=True, interleave=True, ignore_bkg=True):
     """Save multiple parameter values and uncertainties into a file
     
     Args:
@@ -685,6 +697,7 @@ def get_multiple_values(out_name, fnames, extra_values, macro_keys,
         interleave (bool): interleaves uncertainties with parameter values
         (this is default behaviour); if False then puts uncertainties in
         second half of set of columns.
+        ignore_bkg (bool): determines whether to extract bkg parameters or not
     Returns:
         missing_files (list): list of indices to missing filenames in fnames
     """
@@ -694,7 +707,7 @@ def get_multiple_values(out_name, fnames, extra_values, macro_keys,
     for ifn, fn in enumerate(fnames):
         try:
             output = get_values(fn, extra_values, macro_keys, 
-                                macro_structures)
+                                macro_structures, ignore_bkg)
         except IOError:
             if print_warnings:
                 print('File %s missing---moved onto next file' % fn)
