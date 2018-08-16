@@ -7,9 +7,15 @@ Created on Fri Jul  6 10:04:24 2018
 toperrors: a package to read through topas input (or output) files and extract
 the uncertainties calculated therein
 """
+##################################################
+#USERS SHOULD VARY THE PARAMETERS BELOW
+##################################################
+fpath = "C:/Users/vgx18551/Documents/Data/Polaris_Nov15_TMnitriding/Mn1_inps/"
+fpath += "Batch_inps/"
 
-fpath = "C:/Users/vgx18551/Documents/Data/Polaris_Jun18_Faradion_cathode"
-fpath += "/Standards/POL109230-NBS-640b-Si-Riet-01.inp"
+#fnames just has to be a list of appropriate filepaths (below is a suggested
+#method of creating said list)
+fnames = [fpath + str(i) + '.inp' for i in range(84652, 84660)]
 
 extra_values = ['r_wp', 't2', 'mu0', 'mu1']
 macro_keys = ['Cubic', 'Tetragonal', 'Hexagonal', 'Rhombohedral',
@@ -34,6 +40,9 @@ macro_structures = [[2], [2, 2], [2, 2], [2, 2],
 #(3) no equations (this is just too complicated to parse)
 #(4) no min or max within macros (if you're desperate just use the prm keyword)
 
+##################################################
+#USERS SHOULD NOT VARY ANYTHING BELOW THIS LINE
+##################################################
 def line_comment(s, ignore):
     """Looks for ' and returns (modified) string and break_bool"""
     break_bool = False
@@ -122,7 +131,7 @@ def extract_params(s):
 def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                         refp_vals, refp_uncs, unrefined_params, unrefp_vals,
                         unrefp_uncs, macro_name, macro_count, refined=[],
-                        need_name=True, ignores=[]):
+                        need_name=True, ignores=[], wait_for_comma=False):
     """Return parameter value and uncertainty from string
     
     Args:
@@ -145,6 +154,8 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
         need_name (bool): determines whether next parameter needs a name 
         generated or otherwise
         ignores (list): booleans for whether parameter is elsewhere defined
+        wait_for_comma (bool): determines whether to ignore all things before
+        the next comma (used to ignore min and max arguments etc.).
     Returns:
         end_value (bool): if True, end of macro has been found
         ms_count (int): updated ms_count counter
@@ -159,11 +170,21 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
         refined (list): updated list of refined booleans
         need_name (bool): updated need_name boolean
         ignores (list): updated ignore list
+        wait_for_comma (bool): updated wait_for_comma boolean
     """
-    print(s)
+    #print(s)
+    #print(wait_for_comma)
     new_exp_val = False
     end_value = False
+    del_first = False
     s_split = s.split(',')
+    if wait_for_comma:
+        if ',' in s:
+            wait_for_comma = False
+            del_first = True
+        else:
+            s_split = []
+            #print('yes')
     if 1 in macro_structure:
         gen_names = False
     else:
@@ -174,13 +195,18 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
     elif s[-1] == ')':
         end_value = True
     if not exp_val and s[0] == ',':
+        del_first = True
+    if del_first:
         del s_split[0]
-    print(s_split)
+    #print(s_split)
     for i, ss in enumerate(s_split):
-        print('s_split string: %s' % ss)
+        #print('s_split string: %s' % ss)
         if len(macro_structure) == ms_count:
             break
-        if len(ss) > 0 and ss[0] == ')':
+        if ss and ss[0] == ')':
+            break
+        if ss == 'min' or ss == 'max':
+            wait_for_comma = True
             break
         if macro_structure[ms_count] == 1:
             if ss == '':
@@ -260,12 +286,12 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
                     del ignores[0]
         if i < len(s_split)-1:
             ms_count += 1
-    if s.count(',') >= len(s_split):
+    if s.count(',') >= len(s_split) and s.count(','):
         ms_count += 1
     output = end_value, ms_count, new_exp_val, macro_count, refined_params, \
            refp_vals, refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-           refined, need_name, ignores   
-    print(output)
+           refined, need_name, ignores, wait_for_comma  
+    #print(output)
     return output
 
 def test_macro_func(test_num=0):
@@ -278,7 +304,9 @@ def test_macro_func(test_num=0):
              '!prm_name 24.0, !prm_name2 32.0)',
              '!prm_name 24.0,!prm_name2 32.0)',
              'prm_name,24.0_1.3,prm_name2,32.0)',
-             'prm_n, 24.0_1.3, prm_n2, 32.0)', ]
+             'prm_n, 24.0_1.3, prm_n2, 32.0)',
+             'prm_n, 24.0_1.3, t1)',
+             'prm_name, 24.0_1.3 min 10 max 30, prm_name2, 32.0 max 40)',]
     strucs = [[1, 2, 1, 2],
               [1, 2, 1, 2],
               [1, 2, 1, 2],
@@ -288,51 +316,61 @@ def test_macro_func(test_num=0):
               [2, 2],
               [2, 2],
               [1, 2, 1, 2],
+              [1, 2, 1, 2],
+              [1, 2, 0],
               [1, 2, 1, 2],]
-    inputs = [(0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, True, [], True, [], [], [], [], [], [], []),
-              (0, 0, True, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, [], [], [], [], [], [], []),
-              (0, 0, False, [], True, ['prm_n'], [2.0], [0.0], [], [], [], []),
+    inputs = [(0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, True, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, True, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, ['prm_n'], [2.0], [0.0], [], [], [], [],
+               False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
+              (0, 0, False, [], True, [], [], [], [], [], [], [], False),
               ]
     outputs = [(True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True, []),
+                [1.3, 0.], [], [], [], [], True, [], False),
                (True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True, []),
+                [1.3, 0.], [], [], [], [], True, [], False),
                (True, 3, False, 2, ['mn0', 'mn1'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True, []),
+                [1.3, 0.], [], [], [], [], True, [], False),
                (True, 3, False, 2, [], [], [], ['mn0', 'mn1'], [24.0, 32.0], 
-                [1.3, 0.], [], True, []),
+                [1.3, 0.], [], True, [], False),
                (True, 3, False, 1, [], [], [], ['mn0', 'prm_name'],
-                [24.0, 32.0], [1.3, 14.3], [], True, []),
+                [24.0, 32.0], [1.3, 14.3], [], True, [], False),
                (True, 1, False, 2, [], [], [], ['mn0', 'mn1'], [24.0, 32.0],
-                [0.0, 0.0], [], True, []),
+                [0.0, 0.0], [], True, [], False),
                (True, 1, False, 0, [], [], [], ['prm_name', 'prm_name2'], 
-                [24.0, 32.0], [0.0, 0.0], [], True, []),
+                [24.0, 32.0], [0.0, 0.0], [], True, [], False),
                (True, 1, False, 0, [], [], [], ['prm_name', 'prm_name2'], 
-                [24.0, 32.0], [0.0, 0.0], [], True, []),
+                [24.0, 32.0], [0.0, 0.0], [], True, [], False),
                (True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
-                [1.3, 0.], [], [], [], [], True, []),
+                [1.3, 0.], [], [], [], [], True, [], False),
                (True, 3, False, 0, ['prm_n', 'prm_n2'], [2.0, 32.0],
-                [0., 0.], [], [], [], [], True, []),
+                [0., 0.], [], [], [], [], True, [], False),
+               (True, 2, False, 0, ['prm_n'], [24.0],
+                [1.3], [], [], [], [], True, [], False),
+               (True, 3, False, 0, ['prm_name', 'prm_name2'], [24.0, 32.0],
+                [1.3, 0.], [], [], [], [], True, [], True),
               ]
     test = tests[test_num].split()
     ms_count, macro_count, exp_val, refined, nn, rpn, rpv, rpu, upn, upv, upu,\
-    ignores = inputs[test_num]
+    ignores, wfc = inputs[test_num]
     struc = strucs[test_num]
     for t in test:
 #        print(t)
 #        print('%s, %s, %s, %s, %s' % (ms_count, exp_val, macro_count,
 #                                          refined, nn))
         ev, ms_count, exp_val, macro_count, rpn, rpv, rpu, upn, upv, upu,\
-        refined, nn, ignores = extract_macro_value(t, ms_count, struc, exp_val, rpn, 
-                                          rpv, rpu, upn, upv, upu, 'mn', 
-                                          macro_count, refined, nn, ignores)
+        refined, nn, ignores, wfc =\
+        extract_macro_value(t, ms_count, struc, exp_val, rpn, rpv, rpu, upn, 
+                            upv, upu, 'mn', macro_count, refined, nn, ignores,
+                            wfc)
 #        print('%s, %s, %s, %s, %s, %s %s' % (ev, ms_count, exp_val, macro_count,
 #                                             refined, nn, ignores))
 #        print(upn)
@@ -340,7 +378,7 @@ def test_macro_func(test_num=0):
     #check against outputs
     output = outputs[test_num]
     new_output = [ev, ms_count, exp_val, macro_count, rpn, rpv, rpu,
-                  upn, upv, upu, refined, nn, ignores]
+                  upn, upv, upu, refined, nn, ignores, wfc]
     bools = []
     for i, o in enumerate(output):
         bools.append(new_output[i] == o)
@@ -397,6 +435,7 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
     
     with open(fpath, 'r') as f:
         for i, line in enumerate(f):
+            print(i)
             for l in line.split():
                 s, break_bool = line_comment(l, ignore)
                 if not break_bool:
@@ -564,11 +603,14 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                 if macro_k:
                     ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
                     refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-                    refined_bools, nn, ignores = extract_macro_value(l, ms_count,\
-                        struc, exp_val, refined_params, refp_vals, refp_uncs,\
-                        unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
-                        macro_count, refined_bools, nn, ignores)
+                    refined_bools, nn, ignores, wfc = \
+                    extract_macro_value(l, ms_count, struc, exp_val, 
+                                        refined_params, refp_vals, refp_uncs,
+                                        unrefined_params, unrefp_vals,
+                                        unrefp_uncs, macro_name, macro_count, 
+                                        refined_bools, nn, ignores, wfc)
                     if ev:
+                        macro_counts[macro_i] = macro_count
                         macro_k = False
                 if l.split('(')[0] in macro_keys:
                     macro_k = True
@@ -580,20 +622,25 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                     refined_bools = []
                     nn = True
                     ignores = []
+                    wfc = False
                     ms = l.split('(')[1]
-                    if ms == ',':
+                    if ms == ',' or ms == '':
                         exp_val = True
                     else:
                         exp_val = False
-                    ev, ms_count, exp_val, macro_count, refined_params, refp_vals,\
-                    refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-                    refined_bools, nn, ignores = extract_macro_value(ms, ms_count,\
-                        struc, exp_val, refined_params, refp_vals, refp_uncs,\
-                        unrefined_params, unrefp_vals, unrefp_uncs, macro_name,\
-                        macro_count, refined_bools, nn, ignores)
-                    if ev:
-                        macro_counts[macro_i] = macro_count
-                        macro_k = False
+                    if ms:
+                        ev, ms_count, exp_val, macro_count, refined_params,\
+                        refp_vals, refp_uncs, unrefined_params, unrefp_vals,\
+                        unrefp_uncs, refined_bools, nn, ignores, wfc =\
+                        extract_macro_value(ms, ms_count, struc, exp_val,
+                                            refined_params, refp_vals,
+                                            refp_uncs, unrefined_params, 
+                                            unrefp_vals, unrefp_uncs, 
+                                            macro_name, macro_count, 
+                                            refined_bools, nn, ignores, wfc)
+                        if ev:
+                            macro_counts[macro_i] = macro_count
+                            macro_k = False
                 #This breaks the line when a ' comment out has been used
                 if break_bool:
                     break
@@ -602,5 +649,5 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
     return output
             
 ##############STILL to do
-#(3) Put with statement into a function
-#(4) Make good for multiple files
+#(1) Produce write function
+#(2) Make good for multiple files
