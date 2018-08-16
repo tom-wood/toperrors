@@ -26,8 +26,10 @@ expected; (iii) 2 for when a parameter value is expected (this can still take th
 ### Running the functions
 Once the above variables have been adjusted and toperrors.py run, then the
 relevant line of code is:
+
     get_multiple_values(out_name, fnames, extra_values, macro_keys,
                         macro_structures)
+
 This will output a text file with the first line as the saved parameter
 names, followed by columns of the parameter values themselves.
 ```get_multiple_values``` takes a number of keyword arguments, which can
