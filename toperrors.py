@@ -17,6 +17,9 @@ fpath += "Batch_inps/"
 #method of creating said list)
 fnames = [fpath + str(i) + '.inp' for i in range(84652, 84660)]
 
+#out_name is the filepath to save the values to
+out_name = fpath + 'test.txt'
+
 extra_values = ['r_wp', 't2', 'mu0', 'mu1']
 macro_keys = ['Cubic', 'Tetragonal', 'Hexagonal', 'Rhombohedral',
               'TOF_Strain_L', 'TOF_Strain_G', 'TOF_CS_L', 'TOF_CS_G',
@@ -651,6 +654,100 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
     output = (refined_params, refp_vals, refp_uncs, unrefined_params,
               unrefp_vals, unrefp_uncs)
     return output
+
+def find_extra_values(extra_values, params):
+    """Return indices and values of extra_values found in params"""
+    evis, evals = [], []
+    for ev in extra_values:
+        for i, p in enumerate(params):
+            #next if statement conditional on no parameter name overlap
+            if len(p) >= len(ev) and p[:len(ev)] == ev:
+                evis.append(i)
+                evals.append(p)
+    return evis, evals
+                
+def get_multiple_values(out_name, fnames, extra_values, macro_keys,
+                        macro_structures, save_all=False, append=False,
+                        print_warnings=True, interleave=True):
+    """Save multiple parameter values and uncertainties into a file
+    
+    Args:
+        out_name (str): filepath where values will be written
+        fnames (list): list of filenames to read
+        extra_values (list): list of extra values to record (tend to be values
+        rather than parameters).
+        macro_keys (list): list of macro keywords
+        macro_structures (list): list of macro structures
+        save_all (bool): whether to save all parameters or just the refined
+        parameters along with the extra values.
+        append (bool): whether to append values out file or overwrite
+        print_warnings (bool): whether to print_warnings or not
+        interleave (bool): interleaves uncertainties with parameter values
+        (this is default behaviour); if False then puts uncertainties in
+        second half of set of columns.
+    """
+    out_strs = ['refined parameters', 'urefined parameters']
+    success_open = False
+    missing_files = []
+    for ifn, fn in enumerate(fnames):
+        try:
+            output = get_values(fn, extra_values, macro_keys, 
+                                macro_structures)
+        except IOError:
+            if print_warnings:
+                print('File %s missing---moved onto next file' % fn)
+            missing_files.append(ifn)
+            continue
+        if not success_open:
+            success_open = True
+            out0 = output
+            fn0 = fn
+            if not append:
+                if save_all:
+                    save_names = output[0] + output[3]
+                else:
+                    evis, evals = find_extra_values(extra_values,
+                                                    output[3])
+                    save_names = output[0] + evals
+                unc_names = [sn + '_unc' for sn in save_names]
+                if interleave:
+                    save_names = [v for p in zip(save_names, unc_names) for v
+                                  in p]
+                else:
+                    save_names += unc_names
+                save_names = ' '.join(save_names) + '\n'
+                with open(out_name, 'w') as f:
+                    f.write(save_names)
+        else:
+            if print_warnings:
+                for i0 in [0, 3]:
+                    for i1, obit in enumerate(output[i0]):
+                        if out0[i0][i1] != obit:
+                            print("In %s, %s has %s at position %d, whereas\
+                                  %s has %s" % (out_strs[i0], fn, obit, i1, 
+                                                fn0, out0[i0][i1]))
+                            continue
+        if save_all:
+            save_vals = output[1] + output[4]
+            save_uncs = output[2] + output[5]
+        else:
+            evis = find_extra_values(extra_values, output[3])[0]
+            save_vals = output[1] + [output[4][evi] for evi in evis]
+            save_uncs = output[2] + [output[5][evi] for evi in evis]
+        if interleave:
+            save_vals = [v for p in zip(save_vals, save_uncs) for v in p]
+        else:
+            save_vals += save_uncs
+        save_vals = [str(sv) for sv in save_vals]
+        save_vals = ' '.join(save_vals) + '\n'
+        with open(out_name, 'a') as f:
+            f.write(save_vals)
+    return missing_files
+            
+            
+            
+                
+                
             
 ##############STILL to do
 #(1) Produce write function
