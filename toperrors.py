@@ -685,6 +685,8 @@ def get_multiple_values(out_name, fnames, extra_values, macro_keys,
         interleave (bool): interleaves uncertainties with parameter values
         (this is default behaviour); if False then puts uncertainties in
         second half of set of columns.
+    Returns:
+        missing_files (list): list of indices to missing filenames in fnames
     """
     out_strs = ['refined parameters', 'urefined parameters']
     success_open = False
