@@ -435,7 +435,7 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
     
     with open(fpath, 'r') as f:
         for i, line in enumerate(f):
-            print(i)
+            #print(i)
             for l in line.split():
                 s, break_bool = line_comment(l, ignore)
                 if not break_bool:
@@ -479,7 +479,6 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                             unrefp_uncs.append(u)
                             unrefined_params.append(p_name)
                         continue
-                refined = False
                 bkg = is_bkg(l)
                 #work out prm parameters
                 if extract_next:
@@ -496,11 +495,11 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                             else:
                                 if semicolon:
                                     semicolon = False
-                                    continue
+                                    extract_next = False
                                 else:
                                     refined = True
                                     p_name = l
-                                continue
+                                    continue
                         elif l[0] == '=':
                             equal_defer = True
                             if l[-1] == ';':
@@ -519,18 +518,23 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                                 continue
                             else:
                                 p, u = extract_params(l)
-                                if refined:
-                                    refined_params.append(p_name)
-                                    refp_vals.append(p)
-                                    refp_uncs.append(u)
-                                    refined = False
-                                else:
-                                    unrefined_params.append(p_name)
-                                    unrefp_vals.append(p)
-                                    unrefp_uncs.append(u)  
-                                    print('%s added on line %d' %(p_name, i+1))
+                                if p_name not in refined_params and p_name \
+                                not in unrefined_params:
+                                    if refined:
+                                        refined_params.append(p_name)
+                                        refp_vals.append(p)
+                                        refp_uncs.append(u)
+#                                        print('R %s added on line %d' %(p_name, 
+#                                                                        i+1))
+                                    else:
+                                        unrefined_params.append(p_name)
+                                        unrefp_vals.append(p)
+                                        unrefp_uncs.append(u)
+#                                        print('U %s added on line %d' %(p_name, 
+#                                                                        i+1))
                                 semicolon = False
                                 extract_next = False
+                                refined = False
                         elif l[0] == ':':
                             if semicolon:
                                 continue
@@ -540,15 +544,15 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                                 equal_defer = False
                             continue
                 if l in extra_values:
-                    print('%s extra value' % l)
+                    #print('%s extra value' % l)
                     extract_next = True
                     p_name = l
                     d = extra_values.index(l)
                     if count_extra[d] != 0:
-                        p_name += str(count_extra[d])
+                        p_name += '_' + str(count_extra[d])
                     count_extra[d] += 1
                 if l in extract_keys:
-                    print('%s extract key' % l)
+                    #print('%s extract key' % l)
                     extract_next = True
                     p_name = l + str(count_extract[extract_keys.index(l)])
                     count_extract[extract_keys.index(l)] += 1
@@ -580,7 +584,7 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                         phase_name = True
                     elif l in struc_keys:
                         p_name = '_'.join([ph_name, l])
-                        print('%s struc key' % l)
+                        #print('%s struc key' % l)
                         extract_next = True
                 if site_name:
                     current_site = l
@@ -588,7 +592,7 @@ def get_values(fpath, extra_values, macro_keys, macro_structures):
                 if site:
                     if l in site_keys:
                         p_name = '_'.join([ph_name, current_site, l])
-                        print('%s site key' % l)
+                        #print('%s site key' % l)
                         extract_next = True
                 if l == 'site':
                     site = True
