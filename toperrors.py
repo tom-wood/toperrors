@@ -760,12 +760,3 @@ def get_multiple_values(out_name, fnames, extra_values, macro_keys,
         with open(out_name, 'a') as f:
             f.write(save_vals)
     return missing_files
-            
-            
-            
-                
-                
-            
-##############STILL to do
-#(1) Produce write function
-#(2) Make good for multiple files
