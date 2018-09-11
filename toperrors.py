@@ -510,7 +510,6 @@ def get_values(fpath, extra_values, macro_keys, macro_structures,
                             if equal_defer:
                                 if ';' in l:
                                     equal_defer = False
-                                    print('equal_defer set to False yyyyy')
                                     if l[-1] == ';':
                                         semicolon = True
                                 continue
@@ -523,17 +522,15 @@ def get_values(fpath, extra_values, macro_keys, macro_structures,
                                     p_name = l
                                     continue
                         elif l[0] == '=':
+                            refined = False
                             equal_defer = True
-                            print('line %d, equal_defer set to True' % (i+1))
                             if ';' in l:
                                 equal_defer = False
-                                print('equal_defer set to False yyyyy')
                                 if l[-1] == ';':
                                     semicolon = True
                             continue
                         elif l[0] == ';':
                             equal_defer = False
-                            print('equal_defer set to False')
                             semicolon = True
                             continue
                         elif l[0] == '-' or l[0].isdigit():
@@ -541,7 +538,6 @@ def get_values(fpath, extra_values, macro_keys, macro_structures,
                                 if l[-1] == ';':
                                     semicolon = True
                                     equal_defer = False
-                                    print('equal_defer set to False')
                                 continue
                             else:
                                 p, u = extract_params(l)
@@ -569,7 +565,6 @@ def get_values(fpath, extra_values, macro_keys, macro_structures,
                             if l[-1] == ';':
                                 semicolon = True
                                 equal_defer = False
-                                print('equal_defer set to False')
                             continue
                 if l in extra_values:
                     #print('%s extra value' % l)
