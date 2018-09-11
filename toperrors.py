@@ -10,12 +10,14 @@ the uncertainties calculated therein
 ##################################################
 #USERS SHOULD VARY THE PARAMETERS BELOW
 ##################################################
-fpath = "C:/Users/vgx18551/Documents/Data/Polaris_Nov15_TMnitriding/Mn1_inps/"
-fpath += "Batch_inps/"
+#fpath = "C:/Users/vgx18551/Documents/Data/Polaris_Nov15_TMnitriding/Mn1_inps/"
+#fpath += "Batch_inps/"
+fpath = "C:/Users/vgx18551/Documents/Data_analysis/toperrors/"
 
 #fnames just has to be a list of appropriate filepaths (below is a suggested
 #method of creating said list)
-fnames = [fpath + str(i) + '.inp' for i in range(84652, 84660)]
+#fnames = [fpath + str(i) + '.inp' for i in range(84652, 84660)]
+fnames = [fpath + '104234.inp']
 
 #out_name is the filepath to save the values to
 out_name = fpath + 'test.txt'
@@ -293,7 +295,7 @@ def extract_macro_value(s, ms_count, macro_structure, exp_val, refined_params,
         ms_count += 1
     output = end_value, ms_count, new_exp_val, macro_count, refined_params, \
            refp_vals, refp_uncs, unrefined_params, unrefp_vals, unrefp_uncs,\
-           refined, need_name, ignores, wait_for_comma  
+           refined, need_name, ignores, wait_for_comma
     #print(output)
     return output
 
@@ -517,9 +519,10 @@ def get_values(fpath, extra_values, macro_keys, macro_structures,
                                     continue
                         elif l[0] == '=':
                             equal_defer = True
-                            if l[-1] == ';':
+                            if ';' in l:
                                 equal_defer = False
-                                semicolon = True
+                                if l[-1] == ';':
+                                    semicolon = True
                             continue
                         elif l[0] == ';':
                             equal_defer = False
